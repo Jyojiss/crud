@@ -1,0 +1,14 @@
+# Frontend
+node_modules/
+dist/
+.env
+
+# Backend .NET
+bin/
+obj/
+appsettings.Development.json
+*.user
+*.suo
+
+# Sistema
+.DS_Store
