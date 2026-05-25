@@ -5,10 +5,35 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using UserCrudApi.Data;
 using UserCrudApi.Services;
+using UserCrudApi.Middlewares;
+using Microsoft.AspNetCore.Mvc;
+using UserCrudApi.Common;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var errors = context.ModelState
+                .Where(e => e.Value?.Errors.Count > 0)
+                .ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => kvp.Value!.Errors
+                        .Select(e => e.ErrorMessage)
+                        .ToArray()
+                );
+
+            var response = ApiResponse<object>.Fail(
+                StatusCodes.Status400BadRequest,
+                "Error de validación.",
+                errors
+            );
+
+            return new BadRequestObjectResult(response);
+        };
+    });
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
@@ -79,6 +104,8 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+app.UseMiddleware<ExceptionMiddleware>();
 
 app.UseSwagger();
 app.UseSwaggerUI();

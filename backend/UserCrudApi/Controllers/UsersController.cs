@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using UserCrudApi.Common;
 using UserCrudApi.Data;
 using UserCrudApi.DTOs;
 using UserCrudApi.Models;
@@ -73,14 +74,23 @@ public class UsersController : ControllerBase
     {
         if (!IsAdmin() && GetCurrentUserId() != id)
         {
-            return Forbid();
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                ApiResponse<object>.Fail(
+                    StatusCodes.Status403Forbidden,
+                    "No tienes permisos para consultar este usuario."
+                )
+            );
         }
 
         var user = await _context.Users.FindAsync(id);
 
         if (user is null)
         {
-            return NotFound(new { message = "Usuario no encontrado." });
+            return NotFound(ApiResponse<object>.Fail(
+                StatusCodes.Status404NotFound,
+                "Usuario no encontrado."
+            ));
         }
 
         return Ok(ToUserResponse(user));
@@ -96,12 +106,18 @@ public class UsersController : ControllerBase
 
         if (emailExists)
         {
-            return Conflict(new { message = "El email ya está registrado." });
+            return Conflict(ApiResponse<object>.Fail(
+                StatusCodes.Status409Conflict,
+                "El email ya está registrado."
+            ));
         }
 
         if (request.Role != "admin" && request.Role != "user")
         {
-            return BadRequest(new { message = "El rol debe ser admin o user." });
+            return BadRequest(ApiResponse<object>.Fail(
+                StatusCodes.Status400BadRequest,
+                "El rol debe ser admin o user."
+            ));
         }
 
         var user = new User
@@ -127,26 +143,41 @@ public class UsersController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Usuario no autenticado." });
+            return Unauthorized(ApiResponse<object>.Fail(
+                StatusCodes.Status401Unauthorized,
+                "Usuario no autenticado."
+            ));
         }
 
         var isOwner = currentUserId == id;
 
         if (!isAdmin && !isOwner)
         {
-            return Forbid();
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                ApiResponse<object>.Fail(
+                    StatusCodes.Status403Forbidden,
+                    "No tienes permisos para editar este usuario."
+                )
+            );
         }
 
         var user = await _context.Users.FindAsync(id);
 
         if (user is null)
         {
-            return NotFound(new { message = "Usuario no encontrado." });
+            return NotFound(ApiResponse<object>.Fail(
+                StatusCodes.Status404NotFound,
+                "Usuario no encontrado."
+            ));
         }
 
         if (string.IsNullOrWhiteSpace(request.Name))
         {
-            return BadRequest(new { message = "El nombre es obligatorio." });
+            return BadRequest(ApiResponse<object>.Fail(
+                StatusCodes.Status400BadRequest,
+                "El nombre es obligatorio."
+            ));
         }
 
         user.Name = request.Name.Trim();
@@ -162,7 +193,10 @@ public class UsersController : ControllerBase
 
                 if (emailExists)
                 {
-                    return Conflict(new { message = "El email ya está registrado." });
+                    return Conflict(ApiResponse<object>.Fail(
+                        StatusCodes.Status409Conflict,
+                        "El email ya está registrado."
+                    ));
                 }
 
                 user.Email = email;
@@ -173,7 +207,10 @@ public class UsersController : ControllerBase
         {
             if (request.Password.Length < 8)
             {
-                return BadRequest(new { message = "La contraseña debe tener mínimo 8 caracteres." });
+                return BadRequest(ApiResponse<object>.Fail(
+                    StatusCodes.Status400BadRequest,
+                    "La contraseña debe tener mínimo 8 caracteres."
+                ));
             }
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
@@ -187,7 +224,10 @@ public class UsersController : ControllerBase
 
                 if (role != "admin" && role != "user")
                 {
-                    return BadRequest(new { message = "El rol debe ser admin o user." });
+                    return BadRequest(ApiResponse<object>.Fail(
+                        StatusCodes.Status400BadRequest,
+                        "El rol debe ser admin o user."
+                    ));
                 }
 
                 user.Role = role;
@@ -202,12 +242,24 @@ public class UsersController : ControllerBase
         {
             if (!string.IsNullOrWhiteSpace(request.Role) && request.Role != user.Role)
             {
-                return Forbid();
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    ApiResponse<object>.Fail(
+                        StatusCodes.Status403Forbidden,
+                        "No tienes permisos para modificar el rol."
+                    )
+                );
             }
 
             if (request.IsActive.HasValue && request.IsActive.Value != user.IsActive)
             {
-                return Forbid();
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    ApiResponse<object>.Fail(
+                        StatusCodes.Status403Forbidden,
+                        "No tienes permisos para modificar el estado del usuario."
+                    )
+                );
             }
         }
 
@@ -226,7 +278,10 @@ public class UsersController : ControllerBase
 
         if (user is null)
         {
-            return NotFound(new { message = "Usuario no encontrado." });
+            return NotFound(ApiResponse<object>.Fail(
+                StatusCodes.Status404NotFound,
+                "Usuario no encontrado."
+            ));
         }
 
         _context.Users.Remove(user);
@@ -242,14 +297,20 @@ public class UsersController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized();
+            return Unauthorized(ApiResponse<object>.Fail(
+                StatusCodes.Status401Unauthorized,
+                "Usuario no autenticado."
+            ));
         }
 
         var user = await _context.Users.FindAsync(currentUserId);
 
         if (user is null)
         {
-            return NotFound(new { message = "Usuario no encontrado." });
+            return NotFound(ApiResponse<object>.Fail(
+                StatusCodes.Status404NotFound,
+                "Usuario no encontrado."
+            ));
         }
 
         return Ok(ToUserResponse(user));

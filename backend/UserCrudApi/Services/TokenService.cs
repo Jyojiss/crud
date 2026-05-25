@@ -17,10 +17,30 @@ public class TokenService
 
     public string GenerateToken(User user)
     {
-        var jwtKey = _configuration["Jwt:Key"]!;
+        var jwtKey = _configuration["Jwt:Key"];
         var issuer = _configuration["Jwt:Issuer"];
         var audience = _configuration["Jwt:Audience"];
-        var expiresInMinutes = int.Parse(_configuration["Jwt:ExpiresInMinutes"] ?? "60");
+        var expiresInMinutesValue = _configuration["Jwt:ExpiresInMinutes"] ?? "60";
+
+        if (string.IsNullOrWhiteSpace(jwtKey))
+        {
+            throw new InvalidOperationException("Jwt:Key no está configurada.");
+        }
+
+        if (string.IsNullOrWhiteSpace(issuer))
+        {
+            throw new InvalidOperationException("Jwt:Issuer no está configurado.");
+        }
+
+        if (string.IsNullOrWhiteSpace(audience))
+        {
+            throw new InvalidOperationException("Jwt:Audience no está configurado.");
+        }
+
+        if (!int.TryParse(expiresInMinutesValue, out var expiresInMinutes))
+        {
+            expiresInMinutes = 60;
+        }
 
         var claims = new List<Claim>
         {
