@@ -31,3 +31,8 @@ export const deleteUserRequest = async (id) => {
   const response = await axiosClient.delete(`/users/${id}`);
   return response.data;
 };
+
+export const getProfileRequest = async () => {
+  const response = await axiosClient.get("/users/profile");
+  return response.data;
+};

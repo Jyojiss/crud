@@ -15,22 +15,22 @@ const Sidebar = () => {
       <div>
         <h2 className="sidebar-logo">UserAdmin</h2>
         <p className="sidebar-user">{user?.email}</p>
+
+        <nav className="sidebar-nav">
+          {isAdmin && (
+            <>
+              <NavLink to="/users">Usuarios</NavLink>
+              <NavLink to="/users/new">Crear usuario</NavLink>
+            </>
+          )}
+
+          <NavLink to="/profile">Perfil</NavLink>
+
+          <button type="button" onClick={handleLogout}>
+            Cerrar sesión
+          </button>
+        </nav>
       </div>
-
-      <nav className="sidebar-nav">
-        {isAdmin && (
-          <>
-            <NavLink to="/users">Usuarios</NavLink>
-            <NavLink to="/users/new">Crear usuario</NavLink>
-          </>
-        )}
-
-        <NavLink to="/profile">Perfil</NavLink>
-
-        <button type="button" onClick={handleLogout}>
-          Cerrar sesión
-        </button>
-      </nav>
     </aside>
   );
 };

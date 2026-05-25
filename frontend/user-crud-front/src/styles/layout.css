@@ -23,7 +23,7 @@
 
 .sidebar-user {
   margin: 8px 0 0;
-  color: #cbd5e1;
+  color: #dbeafe;
   font-size: 13px;
   word-break: break-all;
 }
@@ -32,6 +32,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  margin-top: 32px;
 }
 
 .sidebar-nav a,
@@ -49,6 +50,12 @@
 }
 
 .sidebar-nav a {
+  text-decoration: none;
+}
+
+.sidebar-nav a:hover,
+.sidebar-nav button:hover {
+  background: #3b82f6;
   text-decoration: none;
 }
 
