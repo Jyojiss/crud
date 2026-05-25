@@ -120,12 +120,19 @@ public class UsersController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    public async Task<ActionResult<UserResponse>> UpdateUser(Guid id, UpdateUserRequest request)
+    public async Task<ActionResult<UserResponse>> UpdateUser(Guid id, UpdateUserDto request)
     {
         var currentUserId = GetCurrentUserId();
         var isAdmin = IsAdmin();
 
-        if (!isAdmin && currentUserId != id)
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Usuario no autenticado." });
+        }
+
+        var isOwner = currentUserId == id;
+
+        if (!isAdmin && !isOwner)
         {
             return Forbid();
         }
@@ -137,19 +144,53 @@ public class UsersController : ControllerBase
             return NotFound(new { message = "Usuario no encontrado." });
         }
 
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            return BadRequest(new { message = "El nombre es obligatorio." });
+        }
+
         user.Name = request.Name.Trim();
-        user.UpdatedAt = DateTime.UtcNow;
+
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            var email = request.Email.Trim().ToLower();
+
+            if (email != user.Email)
+            {
+                var emailExists = await _context.Users
+                    .AnyAsync(u => u.Email == email && u.Id != id);
+
+                if (emailExists)
+                {
+                    return Conflict(new { message = "El email ya está registrado." });
+                }
+
+                user.Email = email;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Password))
+        {
+            if (request.Password.Length < 8)
+            {
+                return BadRequest(new { message = "La contraseña debe tener mínimo 8 caracteres." });
+            }
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+        }
 
         if (isAdmin)
         {
             if (!string.IsNullOrWhiteSpace(request.Role))
             {
-                if (request.Role != "admin" && request.Role != "user")
+                var role = request.Role.Trim().ToLower();
+
+                if (role != "admin" && role != "user")
                 {
                     return BadRequest(new { message = "El rol debe ser admin o user." });
                 }
 
-                user.Role = request.Role;
+                user.Role = role;
             }
 
             if (request.IsActive.HasValue)
@@ -157,6 +198,20 @@ public class UsersController : ControllerBase
                 user.IsActive = request.IsActive.Value;
             }
         }
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(request.Role) && request.Role != user.Role)
+            {
+                return Forbid();
+            }
+
+            if (request.IsActive.HasValue && request.IsActive.Value != user.IsActive)
+            {
+                return Forbid();
+            }
+        }
+
+        user.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
