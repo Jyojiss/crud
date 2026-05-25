@@ -1,0 +1,48 @@
+:root {
+  --color-bg: #f3f7fb;
+  --color-panel: #ffffff;
+  --color-primary: #3152f4;
+  --color-primary-dark: #243ed0;
+  --color-sidebar: #17213d;
+  --color-text: #172033;
+  --color-muted: #697386;
+  --color-border: #d8e1ef;
+  --color-danger: #dc2626;
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: none;
+  cursor: pointer;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
