@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using UserCrudApi.Common;
 using UserCrudApi.Data;
 using UserCrudApi.DTOs;
 using UserCrudApi.Models;
@@ -23,17 +24,22 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request)
     {
+        var email = request.Email.Trim().ToLower();
+
         var emailExists = await _context.Users
-            .AnyAsync(u => u.Email == request.Email);
+            .AnyAsync(u => u.Email == email);
 
         if (emailExists)
         {
-            return Conflict(new { message = "El email ya está registrado." });
+            return Conflict(ApiResponse<object>.Fail(
+                StatusCodes.Status409Conflict,
+                "El email ya está registrado."
+            ));
         }
 
         var user = new User
         {
-            Email = request.Email.Trim().ToLower(),
+            Email = email,
             Name = request.Name.Trim(),
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = "user",
@@ -43,11 +49,13 @@ public class AuthController : ControllerBase
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
-        var token = _tokenService.GenerateToken(user);
+        var accessToken = _tokenService.GenerateToken(user);
+        var refreshToken = await CreateRefreshTokenAsync(user.Id);
 
         return Ok(new AuthResponse
         {
-            AccessToken = token,
+            AccessToken = accessToken,
+            RefreshToken = refreshToken,
             User = ToUserResponse(user)
         });
     }
@@ -62,28 +70,138 @@ public class AuthController : ControllerBase
 
         if (user is null)
         {
-            return Unauthorized(new { message = "Credenciales inválidas." });
+            return Unauthorized(ApiResponse<object>.Fail(
+                StatusCodes.Status401Unauthorized,
+                "Credenciales inválidas."
+            ));
         }
 
         if (!user.IsActive)
         {
-            return Unauthorized(new { message = "El usuario está inactivo." });
+            return Unauthorized(ApiResponse<object>.Fail(
+                StatusCodes.Status401Unauthorized,
+                "El usuario está inactivo."
+            ));
         }
 
         var validPassword = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
 
         if (!validPassword)
         {
-            return Unauthorized(new { message = "Credenciales inválidas." });
+            return Unauthorized(ApiResponse<object>.Fail(
+                StatusCodes.Status401Unauthorized,
+                "Credenciales inválidas."
+            ));
         }
 
-        var token = _tokenService.GenerateToken(user);
+        var accessToken = _tokenService.GenerateToken(user);
+        var refreshToken = await CreateRefreshTokenAsync(user.Id);
 
         return Ok(new AuthResponse
         {
-            AccessToken = token,
+            AccessToken = accessToken,
+            RefreshToken = refreshToken,
             User = ToUserResponse(user)
         });
+    }
+
+    [HttpPost("refresh")]
+    public async Task<ActionResult<AuthResponse>> Refresh(RefreshTokenRequest request)
+    {
+        var refreshTokenHash = _tokenService.HashRefreshToken(request.RefreshToken);
+
+        var storedRefreshToken = await _context.RefreshTokens
+            .Include(rt => rt.User)
+            .FirstOrDefaultAsync(rt => rt.TokenHash == refreshTokenHash);
+
+        if (storedRefreshToken is null)
+        {
+            return Unauthorized(ApiResponse<object>.Fail(
+                StatusCodes.Status401Unauthorized,
+                "Refresh token inválido."
+            ));
+        }
+
+        if (storedRefreshToken.IsRevoked)
+        {
+            return Unauthorized(ApiResponse<object>.Fail(
+                StatusCodes.Status401Unauthorized,
+                "Refresh token revocado."
+            ));
+        }
+
+        if (storedRefreshToken.ExpiresAt <= DateTime.UtcNow)
+        {
+            return Unauthorized(ApiResponse<object>.Fail(
+                StatusCodes.Status401Unauthorized,
+                "Refresh token expirado."
+            ));
+        }
+
+        if (!storedRefreshToken.User.IsActive)
+        {
+            return Unauthorized(ApiResponse<object>.Fail(
+                StatusCodes.Status401Unauthorized,
+                "El usuario está inactivo."
+            ));
+        }
+
+        storedRefreshToken.IsRevoked = true;
+        storedRefreshToken.RevokedAt = DateTime.UtcNow;
+
+        var newAccessToken = _tokenService.GenerateToken(storedRefreshToken.User);
+        var newRefreshToken = await CreateRefreshTokenAsync(storedRefreshToken.UserId);
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new AuthResponse
+        {
+            AccessToken = newAccessToken,
+            RefreshToken = newRefreshToken,
+            User = ToUserResponse(storedRefreshToken.User)
+        });
+    }
+
+    [HttpPost("logout")]
+    public async Task<ActionResult> Logout(RefreshTokenRequest request)
+    {
+        var refreshTokenHash = _tokenService.HashRefreshToken(request.RefreshToken);
+
+        var storedRefreshToken = await _context.RefreshTokens
+            .FirstOrDefaultAsync(rt => rt.TokenHash == refreshTokenHash);
+
+        if (storedRefreshToken is null)
+        {
+            return Ok(new { message = "Sesión cerrada correctamente." });
+        }
+
+        if (!storedRefreshToken.IsRevoked)
+        {
+            storedRefreshToken.IsRevoked = true;
+            storedRefreshToken.RevokedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+        }
+
+        return Ok(new { message = "Sesión cerrada correctamente." });
+    }
+
+    private async Task<string> CreateRefreshTokenAsync(Guid userId)
+    {
+        var refreshToken = _tokenService.GenerateRefreshToken();
+        var refreshTokenHash = _tokenService.HashRefreshToken(refreshToken);
+
+        var refreshTokenEntity = new RefreshToken
+        {
+            UserId = userId,
+            TokenHash = refreshTokenHash,
+            ExpiresAt = DateTime.UtcNow.AddDays(7)
+        };
+
+        _context.RefreshTokens.Add(refreshTokenEntity);
+        await _context.SaveChangesAsync();
+
+        return refreshToken;
     }
 
     private static UserResponse ToUserResponse(User user)
