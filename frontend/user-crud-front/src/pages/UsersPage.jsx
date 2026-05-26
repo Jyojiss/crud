@@ -26,7 +26,24 @@ const UsersPage = () => {
       });
 
       const list = data.items || data.users || data.data || data;
-      const pages = data.totalPages || data.pages || 1;
+
+      const totalItems =
+        data.totalItems ||
+        data.totalCount ||
+        data.total ||
+        data.count ||
+        0;
+
+      const pageSize =
+        data.pageSize ||
+        data.size ||
+        size;
+
+      const pages =
+        data.totalPages ||
+        data.pages ||
+        Math.ceil(totalItems / pageSize) ||
+        1;
 
       setUsers(Array.isArray(list) ? list : []);
       setTotalPages(pages);
