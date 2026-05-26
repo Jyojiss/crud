@@ -40,6 +40,12 @@ public class AppDbContext : DbContext
         {
             entity.HasKey(u => u.Id);
 
+            entity.Property(u => u.CreatedBy)
+                .IsRequired(false);
+
+            entity.Property(u => u.UpdatedBy)
+                .IsRequired(false);
+
             entity.Property(u => u.Email)
                 .IsRequired()
                 .HasMaxLength(256);

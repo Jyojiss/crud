@@ -43,7 +43,9 @@ public class AuthController : ControllerBase
             Name = request.Name.Trim(),
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = "user",
-            IsActive = true
+            IsActive = true,
+            CreatedBy = null,
+            UpdatedBy = null
         };
 
         _context.Users.Add(user);
@@ -214,7 +216,9 @@ public class AuthController : ControllerBase
             Role = user.Role,
             IsActive = user.IsActive,
             CreatedAt = user.CreatedAt,
-            UpdatedAt = user.UpdatedAt
+            UpdatedAt = user.UpdatedAt,
+            CreatedBy = user.CreatedBy,
+            UpdatedBy = user.UpdatedBy
         };
     }
 }

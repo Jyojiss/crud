@@ -97,43 +97,47 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "admin")]
-    public async Task<ActionResult<UserResponse>> CreateUser(CreateUserRequest request)
+[Authorize(Roles = "admin")]
+public async Task<ActionResult<UserResponse>> CreateUser(CreateUserRequest request)
+{
+    var currentUserId = GetCurrentUserId();
+
+    var email = request.Email.Trim().ToLower();
+
+    var emailExists = await _context.Users.AnyAsync(u => u.Email == email);
+
+    if (emailExists)
     {
-        var email = request.Email.Trim().ToLower();
-
-        var emailExists = await _context.Users.AnyAsync(u => u.Email == email);
-
-        if (emailExists)
-        {
-            return Conflict(ApiResponse<object>.Fail(
-                StatusCodes.Status409Conflict,
-                "El email ya está registrado."
-            ));
-        }
-
-        if (request.Role != "admin" && request.Role != "user")
-        {
-            return BadRequest(ApiResponse<object>.Fail(
-                StatusCodes.Status400BadRequest,
-                "El rol debe ser admin o user."
-            ));
-        }
-
-        var user = new User
-        {
-            Email = email,
-            Name = request.Name.Trim(),
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-            Role = request.Role,
-            IsActive = true
-        };
-
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetUser), new { id = user.Id }, ToUserResponse(user));
+        return Conflict(ApiResponse<object>.Fail(
+            StatusCodes.Status409Conflict,
+            "El email ya está registrado."
+        ));
     }
+
+    if (request.Role != "admin" && request.Role != "user")
+    {
+        return BadRequest(ApiResponse<object>.Fail(
+            StatusCodes.Status400BadRequest,
+            "El rol debe ser admin o user."
+        ));
+    }
+
+    var user = new User
+    {
+        Email = email,
+        Name = request.Name.Trim(),
+        PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+        Role = request.Role,
+        IsActive = true,
+        CreatedBy = currentUserId,
+        UpdatedBy = null
+    };
+
+    _context.Users.Add(user);
+    await _context.SaveChangesAsync();
+
+    return CreatedAtAction(nameof(GetUser), new { id = user.Id }, ToUserResponse(user));
+}
 
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<UserResponse>> UpdateUser(Guid id, UpdateUserDto request)
@@ -264,6 +268,7 @@ public class UsersController : ControllerBase
         }
 
         user.UpdatedAt = DateTime.UtcNow;
+        user.UpdatedBy = currentUserId;
 
         await _context.SaveChangesAsync();
 
@@ -334,16 +339,18 @@ public class UsersController : ControllerBase
     }
 
     private static UserResponse ToUserResponse(User user)
+{
+    return new UserResponse
     {
-        return new UserResponse
-        {
-            Id = user.Id,
-            Email = user.Email,
-            Name = user.Name,
-            Role = user.Role,
-            IsActive = user.IsActive,
-            CreatedAt = user.CreatedAt,
-            UpdatedAt = user.UpdatedAt
-        };
-    }
+        Id = user.Id,
+        Email = user.Email,
+        Name = user.Name,
+        Role = user.Role,
+        IsActive = user.IsActive,
+        CreatedAt = user.CreatedAt,
+        UpdatedAt = user.UpdatedAt,
+        CreatedBy = user.CreatedBy,
+        UpdatedBy = user.UpdatedBy
+    };
+}
 }

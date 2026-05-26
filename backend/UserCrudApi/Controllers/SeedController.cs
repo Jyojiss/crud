@@ -27,7 +27,9 @@ public class SeedController : ControllerBase
                 Name = "Admin Demo",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!"),
                 Role = "admin",
-                IsActive = true
+                IsActive = true,
+                CreatedBy = null,
+                UpdatedBy = null
             });
         }
 
@@ -39,7 +41,9 @@ public class SeedController : ControllerBase
                 Name = "User Demo",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("User123!"),
                 Role = "user",
-                IsActive = true
+                IsActive = true,
+                CreatedBy = null,
+                UpdatedBy = null
             });
         }
 
