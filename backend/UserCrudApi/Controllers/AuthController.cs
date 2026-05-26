@@ -5,6 +5,7 @@ using UserCrudApi.Data;
 using UserCrudApi.DTOs;
 using UserCrudApi.Models;
 using UserCrudApi.Services;
+using UserCrudApi.Helpers;
 
 namespace UserCrudApi.Controllers;
 
@@ -22,43 +23,45 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
-    public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request)
+    public async Task<IActionResult> Register(RegisterRequest request)
     {
-        var email = request.Email.Trim().ToLower();
+        var passwordErrors = PasswordPolicy.Validate(request.Password);
+        if (passwordErrors.Any())
+        {
+            return BadRequest(new
+            {
+                message = "La contraseña debe contener al menos: una mayuscula, una minuscula, un numero y un caracter especial.",
+                errors = passwordErrors
+            });
+        }
 
-        var emailExists = await _context.Users
-            .AnyAsync(u => u.Email == email);
+        var emailExists = await _context.Users.AnyAsync(u => u.Email == request.Email);
 
         if (emailExists)
         {
-            return Conflict(ApiResponse<object>.Fail(
-                StatusCodes.Status409Conflict,
-                "El email ya está registrado."
-            ));
+            return Conflict(new
+            {
+                message = "El email ya está registrado."
+            });
         }
 
         var user = new User
         {
-            Email = email,
-            Name = request.Name.Trim(),
+            Id = Guid.NewGuid(),
+            Email = request.Email,
+            Name = request.Name,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = "user",
             IsActive = true,
-            CreatedBy = null,
-            UpdatedBy = null
+            CreatedAt = DateTime.UtcNow
         };
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
-        var accessToken = _tokenService.GenerateToken(user);
-        var refreshToken = await CreateRefreshTokenAsync(user.Id);
-
-        return Ok(new AuthResponse
+        return Ok(new
         {
-            AccessToken = accessToken,
-            RefreshToken = refreshToken,
-            User = ToUserResponse(user)
+            message = "Usuario registrado correctamente."
         });
     }
 
